@@ -13,7 +13,7 @@
 #   Master/dev branch: "1.0.0-dev"
 VERSION=15.5.4
 
-DOCKER_IMAGE ?= teleport
+DOCKER_IMAGE ?= us-west1-docker.pkg.dev/liferaycloud-devops/teleport/teleport
 
 GOPATH ?= $(shell go env GOPATH)
 

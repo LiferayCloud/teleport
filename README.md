@@ -1,3 +1,15 @@
+# Custom Documentation
+
+This version of Teleport enables GitHub SSO for the LiferayCloud organization — a feature that
+was previously restricted in the community edition.
+
+Refer to the [*Building Teleport Docker Image documentation*](https://liferay.atlassian.net/wiki/spaces/LC/pages/2709946766/Building+Teleport+Docker+Image)
+on Confluence for instructions on building this image.
+
+---
+
+# Official Documentation
+
 Teleport provides connectivity, authentication, access controls and audit for infrastructure.
 
 Here is why you might use Teleport:
