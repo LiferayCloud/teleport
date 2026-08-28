@@ -70,6 +70,9 @@ func TestDefaultConfig(t *testing.T) {
 		"aes256-ctr",
 	})
 	require.ElementsMatch(t, config.KEXAlgorithms, []string{
+		// Post-quantum hybrid KEX, added to the x/crypto/ssh defaults that
+		// ApplyDefaults inherits via ssh.Config.SetDefaults.
+		"mlkem768x25519-sha256",
 		"curve25519-sha256",
 		"curve25519-sha256@libssh.org",
 		"ecdh-sha2-nistp256",

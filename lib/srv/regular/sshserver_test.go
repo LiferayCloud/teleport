@@ -765,10 +765,22 @@ func TestTCPIPForward(t *testing.T) {
 			ts.Listener = listener
 			ts.Start()
 
+			// As of golang.org/x/crypto v0.52.0, a hostname bind address is
+			// forwarded to the peer verbatim instead of being resolved
+			// locally, and Listener.Addr reports a zero IP. Rebuild the URL
+			// from the address we actually asked to bind so the request
+			// reaches the remote listener.
+			url := ts.URL
+			if reqHost, _, err := net.SplitHostPort(tc.listenAddr); err == nil && net.ParseIP(reqHost) == nil {
+				_, port, err := net.SplitHostPort(strings.TrimPrefix(ts.URL, "http://"))
+				require.NoError(t, err)
+				url = "http://" + net.JoinHostPort(reqHost, port)
+			}
+
 			// Dial the test server over the SSH connection.
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			t.Cleanup(cancel)
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, ts.URL, nil)
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 			require.NoError(t, err)
 			resp, err := ts.Client().Do(req)
 			require.NoError(t, err)
