@@ -4,7 +4,101 @@ This version of Teleport enables GitHub SSO for the LiferayCloud organization �
 was previously restricted in the community edition.
 
 Refer to the [*Building Teleport Docker Image documentation*](https://liferay.atlassian.net/wiki/spaces/LC/pages/2709946766/Building+Teleport+Docker+Image)
-on Confluence for instructions on building this image.
+on Confluence for additional context.
+
+## Building and publishing the image
+
+The deployed image is built from this fork. `DOCKER_IMAGE` in the `Makefile` and
+`GOLANG_VERSION` in `build.assets/versions.mk` are fork-local changes.
+
+### Prerequisites
+
+* Docker with `buildx`
+* `gcloud`, authenticated (`gcloud auth login`)
+* Rust/`cargo` on the host — optional, but see the `target/` note below
+
+### 1. Build the binaries and the `.deb`
+
+```bash
+make image
+```
+
+This compiles the binaries inside the CentOS 7 buildbox (which pins an old glibc so the
+binaries run on any modern distro), packages them into `build/teleport_<VERSION>_<ARCH>.deb`,
+and builds the Ubuntu-based image tagged `$(DOCKER_IMAGE):$(VERSION)-$(ARCH)`.
+
+Two failure modes worth knowing about:
+
+* **After changing `GOLANG_VERSION`, rebuild the buildbox.** Its tag
+  (`teleport-buildbox-centos7:teleport15-amd64`) does not encode the Go version, so a cached
+  or pulled image will silently build with the old toolchain:
+
+  ```bash
+  make -C build.assets buildbox-centos7
+  ```
+
+* **`make clean` cannot clean `target/` unless Rust is installed on the host.** It runs
+  `cargo clean`, and without cargo make logs `Error 127 (ignored)` and skips it. Stale
+  host-mounted artifacts then break the container build with `GLIBC_2.28 not found` or
+  `can't find crate for zeroize_derive`. If that happens:
+
+  ```bash
+  rm -rf target && make image
+  ```
+
+### 2. Build the distroless image (preferred)
+
+The distroless variant is smaller and has a far smaller CVE surface than the Ubuntu one,
+which is still based on the now-EOL `ubuntu:20.04`. It is built from the `.deb` produced
+above; there is no Makefile target for it.
+
+```bash
+cp build.assets/charts/fetch-debs build/
+cd build && docker buildx build \
+  -f ../build.assets/charts/Dockerfile-distroless \
+  --build-arg TELEPORT_VERSION=15.5.4 \
+  --build-arg TELEPORT_RELEASE_INFIX= \
+  --load \
+  -t teleport-distroless:15.5.4-patch.N .
+```
+
+Distroless has **no shell**, so `kubectl exec -it <pod> -- bash` will not work. Use
+`kubectl debug --image=busybox --target=<container>` instead. The chart itself is compatible:
+its probes are `httpGet` and the `preStop` hook execs `teleport` directly.
+
+### 3. Tag and publish
+
+Tags follow `<upstream-version>-patch.<n>` — the binary keeps reporting the upstream version
+it is based on, and the suffix cannot collide with a future upstream release. Never reuse a
+tag that is already deployed.
+
+```bash
+gcloud auth configure-docker us-west1-docker.pkg.dev
+
+IMAGE=us-west1-docker.pkg.dev/internal-assets-prd/services/teleport:15.5.4-patch.N
+docker tag teleport-distroless:15.5.4-patch.N "$IMAGE"
+docker push "$IMAGE"
+
+gcloud artifacts docker images list \
+  us-west1-docker.pkg.dev/internal-assets-prd/services/teleport --include-tags
+```
+
+The cluster node service account needs `roles/artifactregistry.reader` on the repository to
+pull the image. This is managed in `infrastructure-terraform`, so a manual `gcloud` grant will
+be reverted on the next apply.
+
+### Verifying a build
+
+```bash
+./build/teleport version                    # confirms the Go toolchain used
+go version -m ./build/teleport | grep dep   # dependency versions as scanners see them
+govulncheck -scan module                    # source-level advisories
+```
+
+`govulncheck` only sees the source module graph — it does **not** report Go stdlib CVEs,
+since those depend on the toolchain that compiled the binary. Image scanners (Prisma, GAR)
+do see them. Fix those by raising `GOLANG_VERSION`, checking the exact patch release that
+carries the fix.
 
 ---
 

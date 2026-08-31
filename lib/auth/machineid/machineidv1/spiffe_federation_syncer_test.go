@@ -140,18 +140,18 @@ func TestSPIFFEFederationSyncer(t *testing.T) {
 	// Wait for the initially created SPIFFEFederation to be synced
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		got, err := store.GetSPIFFEFederation(ctx, created1.Metadata.Name)
-		if !assert.NoError(t, err) {
+		if !assert.NoError(collect, err) {
 			return
 		}
 		// Check that some update as occurred (as indicated by the revision)
-		if !assert.NotEqual(t, got.Metadata.Revision, created1.Metadata.Revision) {
+		if !assert.NotEqual(collect, got.Metadata.Revision, created1.Metadata.Revision) {
 			return
 		}
 		// Check that the expected status fields have been set...
-		if !assert.NotNil(t, got.Status) {
+		if !assert.NotNil(collect, got.Status) {
 			return
 		}
-		assert.Equal(t, string(marshaledBundle1), got.Status.CurrentBundle)
+		assert.Equal(collect, string(marshaledBundle1), got.Status.CurrentBundle)
 	}, time.Second*10, time.Millisecond*200)
 
 	// Create a second SPIFFEFederation and wait for it to be synced
@@ -172,18 +172,18 @@ func TestSPIFFEFederationSyncer(t *testing.T) {
 	require.NoError(t, err)
 	require.EventuallyWithT(t, func(collect *assert.CollectT) {
 		got, err := store.GetSPIFFEFederation(ctx, created2.Metadata.Name)
-		if !assert.NoError(t, err) {
+		if !assert.NoError(collect, err) {
 			return
 		}
 		// Check that some update as occurred (as indicated by the revision)
-		if !assert.NotEqual(t, got.Metadata.Revision, created2.Metadata.Revision) {
+		if !assert.NotEqual(collect, got.Metadata.Revision, created2.Metadata.Revision) {
 			return
 		}
 		// Check that the expected status fields have been set...
-		if !assert.NotNil(t, got.Status) {
+		if !assert.NotNil(collect, got.Status) {
 			return
 		}
-		assert.Equal(t, string(marshaledBundle2), got.Status.CurrentBundle)
+		assert.Equal(collect, string(marshaledBundle2), got.Status.CurrentBundle)
 	}, time.Second*10, time.Millisecond*200)
 
 	cancel()
